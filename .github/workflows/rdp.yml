@@ -1,0 +1,36 @@
+
+name: Windows-RDP
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Setup Ngrok
+        run: |
+          Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+          Expand-Archive ngrok.zip
+      - name: Authenticate Ngrok
+        run: .\ngrok\ngrok.exe authtoken ak_39l7igxdR5E6Z0LW263xnZIRAv1
+      - name: Enable RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+      - name: Create User
+        run: |
+          net user nexus 8sqdydozvfA1! /add
+          net localgroup administrators nexus /add
+      - name: Start Ngrok Tunnel
+        run: |
+          Start-Process .\ngrok\ngrok.exe -ArgumentList "tcp 3389"
+          Start-Sleep -s 10
+      - name: Get Address
+        run: |
+          $content = Invoke-RestMethod -Uri http://localhost:4040/api/tunnels
+          $addr = $content.tunnels[0].public_url
+          Write-Host "Nexus_RDP_Address: $addr"
+          Write-Host "Nexus_RDP_User: nexus"
+          Write-Host "Nexus_RDP_Pass: 8sqdydozvfA1!"
+      - name: Keep Alive
+        run: Start-Sleep -s 21600
+    
